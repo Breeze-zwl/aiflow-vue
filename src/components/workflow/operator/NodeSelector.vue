@@ -92,11 +92,13 @@ const nodeCategories = [
   {
     title: '基础节点',
     nodes: [
+      BlockEnum.Start,
       BlockEnum.LLM,
       BlockEnum.Code,
       BlockEnum.KnowledgeRetrieval,
       BlockEnum.QuestionClassifier,
       BlockEnum.Answer,
+      BlockEnum.End,
     ],
   },
   {
