@@ -101,7 +101,18 @@
 
 <script setup lang="ts">
 import { computed, provide, ref, watch } from 'vue'
-import { VueFlow, useVueFlow, applyEdgeChanges, applyNodeChanges, MarkerType, SelectionMode, type Connection, type EdgeChange, type NodeChange, type NodeMouseEvent } from '@vue-flow/core'
+import {
+  VueFlow,
+  useVueFlow,
+  applyEdgeChanges,
+  applyNodeChanges,
+  MarkerType,
+  SelectionMode,
+  type Connection,
+  type EdgeChange,
+  type NodeChange,
+  type NodeMouseEvent,
+} from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { MiniMap } from '@vue-flow/minimap'
 import { v4 as uuid } from 'uuid'
@@ -109,7 +120,14 @@ import NodeSelector from './operator/NodeSelector.vue'
 import WorkflowToolbar from './operator/WorkflowToolbar.vue'
 import NodePanel from './panel/NodePanel.vue'
 import CustomNode from './nodes/CustomNode.vue'
-import { BLOCK_CLASSIFICATIONS, BlockEnum, ControlMode, CUSTOM_NODE, type Edge, type Node } from '@/types/workflow'
+import {
+  BLOCK_CLASSIFICATIONS,
+  BlockEnum,
+  ControlMode,
+  CUSTOM_NODE,
+  type Edge,
+  type Node,
+} from '@/types/workflow'
 import { updateNodeDataKey } from '@/composables/useNodeData'
 import StartPanel from './nodes/panels/StartPanel.vue'
 import EndPanel from './nodes/panels/EndPanel.vue'
@@ -124,15 +142,18 @@ import QuestionClassifierPanel from './nodes/panels/QuestionClassifierPanel.vue'
 import VariableAssignerPanel from './nodes/panels/VariableAssignerPanel.vue'
 import TemplateTransformPanel from './nodes/panels/TemplateTransformPanel.vue'
 
-const props = withDefaults(defineProps<{
-  initialNodes?: Node[]
-  initialEdges?: Edge[]
-  readOnly?: boolean
-}>(), {
-  initialNodes: () => [],
-  initialEdges: () => [],
-  readOnly: false,
-})
+const props = withDefaults(
+  defineProps<{
+    initialNodes?: Node[]
+    initialEdges?: Edge[]
+    readOnly?: boolean
+  }>(),
+  {
+    initialNodes: () => [],
+    initialEdges: () => [],
+    readOnly: false,
+  }
+)
 
 const emit = defineEmits<{
   (e: 'nodes-change', nodes: Node[]): void
@@ -150,11 +171,20 @@ const isRunning = ref(false)
 const selectedNodeId = ref<string | null>(null)
 const viewportZoom = ref(1)
 
-const { project, zoomIn, zoomOut, fitView, setViewport, getViewport, addEdges, addNodes } = useVueFlow()
+const {
+  project,
+  zoomIn,
+  zoomOut,
+  fitView,
+  setViewport,
+  getViewport,
+  addEdges,
+  addNodes,
+} = useVueFlow()
 
 const nodeTypes = { [CUSTOM_NODE]: CustomNode }
 
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
+const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 
 watch(
   () => props.initialNodes,
@@ -173,7 +203,10 @@ watch(
 )
 
 const selectedNode = computed(
-  () => (nodes.value.find((node) => node.id === selectedNodeId.value) as Node | undefined) || null
+  () =>
+    (nodes.value.find((node) => node.id === selectedNodeId.value) as
+      | Node
+      | undefined) || null
 )
 const selectedNodeData = computed(() => (selectedNode.value?.data || {}) as any)
 
@@ -228,7 +261,6 @@ const updateNodeData = (nodeId: string, data: Record<string, unknown>) => {
 provide(updateNodeDataKey, updateNodeData)
 
 const handleNodesChange = (changes: NodeChange[]) => {
-  console.log('handleNodesChange called with:', changes)
   const next = applyNodeChanges(changes, nodes.value) as unknown as Node[]
   nodes.value = next
   emit('nodes-change', next)
@@ -241,7 +273,10 @@ const handleEdgesChange = (changes: EdgeChange[]) => {
   if (filteredChanges.length === 0) return
 
   console.log('Applying edge changes:', filteredChanges)
-  const next = applyEdgeChanges(filteredChanges, edges.value) as unknown as Edge[]
+  const next = applyEdgeChanges(
+    filteredChanges,
+    edges.value
+  ) as unknown as Edge[]
   edges.value = next
   emit('edges-change', next)
 }
@@ -249,11 +284,17 @@ const handleEdgesChange = (changes: EdgeChange[]) => {
 const handleConnect = (connection: Connection) => {
   console.log('handleConnect called with:', connection)
   if (!connection.source || !connection.target) return
-  const sourceNode = nodes.value.find((node) => node.id === connection.source) as Node | undefined
-  const targetNode = nodes.value.find((node) => node.id === connection.target) as Node | undefined
+  const sourceNode = nodes.value.find(
+    (node) => node.id === connection.source
+  ) as Node | undefined
+  const targetNode = nodes.value.find(
+    (node) => node.id === connection.target
+  ) as Node | undefined
 
   const newEdge: Edge = {
-    id: `${connection.source}-${connection.sourceHandle || 'default'}-${connection.target}-${connection.targetHandle || 'default'}`,
+    id: `${connection.source}-${connection.sourceHandle || 'default'}-${
+      connection.target
+    }-${connection.targetHandle || 'default'}`,
     source: connection.source,
     target: connection.target,
     sourceHandle: connection.sourceHandle || undefined,
@@ -302,17 +343,30 @@ const handleRunStep = () => {
 const handleLocateNode = () => {
   if (!selectedNode.value) return
   const viewport = getViewport()
-  const canvas = document.querySelector('.wf-canvas .vue-flow') as HTMLElement | null
+  const canvas = document.querySelector(
+    '.wf-canvas .vue-flow'
+  ) as HTMLElement | null
   const canvasWidth = canvas?.clientWidth || window.innerWidth
   const canvasHeight = canvas?.clientHeight || window.innerHeight
-  const nodeWidth = selectedNode.value.dimensions?.width || selectedNode.value.width || 0
-  const nodeHeight = selectedNode.value.dimensions?.height || selectedNode.value.height || 0
+  const nodeWidth =
+    selectedNode.value.dimensions?.width || selectedNode.value.width || 0
+  const nodeHeight =
+    selectedNode.value.dimensions?.height || selectedNode.value.height || 0
   const target = {
-    x: -selectedNode.value.position.x * viewport.zoom + (canvasWidth - nodeWidth * viewport.zoom) / 2,
-    y: -selectedNode.value.position.y * viewport.zoom + (canvasHeight - nodeHeight * viewport.zoom) / 2,
+    x:
+      -selectedNode.value.position.x * viewport.zoom +
+      (canvasWidth - nodeWidth * viewport.zoom) / 2,
+    y:
+      -selectedNode.value.position.y * viewport.zoom +
+      (canvasHeight - nodeHeight * viewport.zoom) / 2,
     zoom: viewport.zoom,
   }
-  ;(setViewport as unknown as (v: typeof target, o?: { duration?: number }) => void)(target, { duration: 320 })
+  ;(
+    setViewport as unknown as (
+      v: typeof target,
+      o?: { duration?: number }
+    ) => void
+  )(target, { duration: 320 })
 }
 
 const handlePanelAction = (command: string) => {
@@ -351,7 +405,9 @@ const handlePanelAction = (command: string) => {
     case 'delete': {
       const targetId = selectedNode.value.id
       nodes.value = nodes.value.filter((node) => node.id !== targetId)
-      edges.value = edges.value.filter((edge) => edge.source !== targetId && edge.target !== targetId)
+      edges.value = edges.value.filter(
+        (edge) => edge.source !== targetId && edge.target !== targetId
+      )
       closePanel()
       break
     }
@@ -383,7 +439,8 @@ const handleEdgeHover = (hovering: boolean) => (event: { edge: Edge }) => {
 const isValidConnection = (connection: Connection) => {
   if (connection.source === connection.target) return false
   const existingEdge = edges.value.find(
-    (edge) => edge.source === connection.source && edge.target === connection.target
+    (edge) =>
+      edge.source === connection.source && edge.target === connection.target
   )
   return !existingEdge
 }
@@ -438,16 +495,19 @@ const handleAddNode = (type: BlockEnum) => {
   let newPosition: { x: number; y: number }
   if (nodes.value.length === 0) {
     // 如果没有节点，放在画布中心
-    const position = project({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
+    const position = project({
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    })
     newPosition = { x: position.x - 100, y: position.y - 30 }
   } else {
     // 找到最右边的节点，新节点放在其右侧
     const rightmostNode = nodes.value.reduce((prev, curr) =>
-      (curr.position.x > prev.position.x) ? curr : prev
+      curr.position.x > prev.position.x ? curr : prev
     )
     newPosition = {
       x: rightmostNode.position.x + 250,
-      y: rightmostNode.position.y
+      y: rightmostNode.position.y,
     }
   }
 
