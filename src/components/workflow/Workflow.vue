@@ -12,6 +12,7 @@
         :nodes="nodes"
         :edges="edges"
         :node-types="nodeTypes"
+        :edge-types="edgeTypes"
         :default-viewport="{ x: 100, y: 100, zoom: 1 }"
         :fit-view-on-init="true"
         :pan-on-scroll="true"
@@ -66,11 +67,11 @@
           :is-running="isRunning"
           :zoom="viewportZoom"
           :read-only="readOnly"
-          @control-change="(mode) => (controlMode = mode)"
-          @zoom-in="zoomIn"
-          @zoom-out="zoomOut"
-          @fit-view="fitView"
-          @zoom-to="handleZoomTo"
+          @control-change="(handleControlChange as any)"
+          @zoom-in="handleZoomIn"
+          @zoom-out="handleZoomOut"
+          @fit-view="handleFitView"
+          @zoom-to="(handleZoomTo as any)"
           @toggle-grid="() => (showGrid = !showGrid)"
           @toggle-minimap="() => (showMinimap = !showMinimap)"
           @run="() => (isRunning = true)"
@@ -120,15 +121,17 @@ import NodeSelector from './operator/NodeSelector.vue'
 import WorkflowToolbar from './operator/WorkflowToolbar.vue'
 import NodePanel from './panel/NodePanel.vue'
 import CustomNode from './nodes/CustomNode.vue'
+import CustomEdge from './edges/CustomEdge.vue'
 import {
   BLOCK_CLASSIFICATIONS,
   BlockEnum,
   ControlMode,
   CUSTOM_NODE,
+  CUSTOM_EDGE,
   type Edge,
   type Node,
 } from '@/types/workflow'
-import { updateNodeDataKey } from '@/composables/useNodeData'
+import { updateNodeDataKey, addNodeFromSourceKey } from '@/composables/useNodeData'
 import StartPanel from './nodes/panels/StartPanel.vue'
 import EndPanel from './nodes/panels/EndPanel.vue'
 import LLMPanel from './nodes/panels/LLMPanel.vue'
@@ -180,9 +183,12 @@ const {
   getViewport,
   addEdges,
   addNodes,
+  removeNodes,
+  getNodes,
 } = useVueFlow()
 
 const nodeTypes = { [CUSTOM_NODE]: CustomNode }
+const edgeTypes = { [CUSTOM_EDGE]: CustomEdge }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 
@@ -197,7 +203,12 @@ watch(
 watch(
   () => props.initialEdges,
   (value) => {
-    edges.value = clone(value || [])
+    const clonedEdges = clone(value || [])
+    // 确保所有边都使用自定义边类型
+    edges.value = clonedEdges.map((edge: Edge) => ({
+      ...edge,
+      type: CUSTOM_EDGE,
+    }))
   },
   { immediate: true }
 )
@@ -243,6 +254,7 @@ const panelComponent = computed(() => {
 })
 
 const updateNodeData = (nodeId: string, data: Record<string, unknown>) => {
+  // 只更新指定节点的 data，保持其他属性（包括 position）不变
   nodes.value = nodes.value.map((node) => {
     if (node.id === nodeId) {
       return {
@@ -260,7 +272,65 @@ const updateNodeData = (nodeId: string, data: Record<string, unknown>) => {
 
 provide(updateNodeDataKey, updateNodeData)
 
+// 从源节点添加新节点（点击节点右侧加号按钮时触发）
+const handleAddNodeFromSource = (sourceNodeId: string, nodeType: BlockEnum) => {
+  const classification = BLOCK_CLASSIFICATIONS[nodeType]
+  if (!classification) return
+
+  // 找到源节点
+  const sourceNode = nodes.value.find((node) => node.id === sourceNodeId)
+  if (!sourceNode) return
+
+  // 计算新节点位置：在源节点右侧
+  const newPosition = {
+    x: sourceNode.position.x + 280,
+    y: sourceNode.position.y
+  }
+
+  const newNodeId = uuid()
+  const newNode: Node = {
+    id: newNodeId,
+    type: CUSTOM_NODE,
+    position: newPosition,
+    data: {
+      type: nodeType,
+      title: classification.title,
+      desc: '',
+    },
+  }
+
+  // 添加新节点
+  addNodes([newNode])
+
+  // 自动创建连线
+  const newEdge: Edge = {
+    id: `${sourceNodeId}-default-${newNodeId}-default`,
+    source: sourceNodeId,
+    target: newNodeId,
+    type: CUSTOM_EDGE,
+    data: {
+      sourceType: sourceNode.data?.type || BlockEnum.Start,
+      targetType: nodeType,
+    },
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+      width: 16,
+      height: 16,
+      color: '#9ca3af',
+    },
+  }
+  addEdges([newEdge])
+  edges.value = [...edges.value, newEdge]
+  emit('edges-change', edges.value)
+
+  // 关闭配置面板
+  closePanel()
+}
+
+provide(addNodeFromSourceKey, handleAddNodeFromSource)
+
 const handleNodesChange = (changes: NodeChange[]) => {
+  console.log('handleNodesChange called with:', changes)
   const next = applyNodeChanges(changes, nodes.value) as unknown as Node[]
   nodes.value = next
   emit('nodes-change', next)
@@ -273,12 +343,29 @@ const handleEdgesChange = (changes: EdgeChange[]) => {
   if (filteredChanges.length === 0) return
 
   console.log('Applying edge changes:', filteredChanges)
-  const next = applyEdgeChanges(
-    filteredChanges,
-    edges.value
-  ) as unknown as Edge[]
-  edges.value = next
-  emit('edges-change', next)
+  console.log('Current edges before change:', JSON.stringify(edges.value.map(e => e.id)))
+
+  // 分离 remove 类型和其他类型的变更
+  const removeChanges = filteredChanges.filter((change) => change.type === 'remove')
+  const otherChanges = filteredChanges.filter((change) => change.type !== 'remove')
+
+  let currentEdges = edges.value
+
+  // 处理 remove 类型的变更
+  if (removeChanges.length > 0) {
+    const removeIds = new Set(removeChanges.map((change) => change.id))
+    console.log('Removing edge ids:', Array.from(removeIds))
+    currentEdges = currentEdges.filter((edge) => !removeIds.has(edge.id))
+  }
+
+  // 处理其他类型的变更
+  if (otherChanges.length > 0) {
+    currentEdges = applyEdgeChanges(otherChanges, currentEdges) as unknown as Edge[]
+  }
+
+  console.log('Edges after change:', JSON.stringify(currentEdges.map(e => e.id)))
+  edges.value = currentEdges
+  emit('edges-change', currentEdges)
 }
 
 const handleConnect = (connection: Connection) => {
@@ -299,7 +386,7 @@ const handleConnect = (connection: Connection) => {
     target: connection.target,
     sourceHandle: connection.sourceHandle || undefined,
     targetHandle: connection.targetHandle || undefined,
-    type: 'default',
+    type: CUSTOM_EDGE,
     data: {
       sourceType: sourceNode?.data?.type || BlockEnum.Start,
       targetType: targetNode?.data?.type || BlockEnum.End,
@@ -343,30 +430,17 @@ const handleRunStep = () => {
 const handleLocateNode = () => {
   if (!selectedNode.value) return
   const viewport = getViewport()
-  const canvas = document.querySelector(
-    '.wf-canvas .vue-flow'
-  ) as HTMLElement | null
+  const canvas = document.querySelector('.wf-canvas .vue-flow') as HTMLElement | null
   const canvasWidth = canvas?.clientWidth || window.innerWidth
   const canvasHeight = canvas?.clientHeight || window.innerHeight
-  const nodeWidth =
-    selectedNode.value.dimensions?.width || selectedNode.value.width || 0
-  const nodeHeight =
-    selectedNode.value.dimensions?.height || selectedNode.value.height || 0
+  const nodeWidth = (selectedNode.value as any).dimensions?.width || selectedNode.value.data?.width || 0
+  const nodeHeight = (selectedNode.value as any).dimensions?.height || selectedNode.value.data?.height || 0
   const target = {
-    x:
-      -selectedNode.value.position.x * viewport.zoom +
-      (canvasWidth - nodeWidth * viewport.zoom) / 2,
-    y:
-      -selectedNode.value.position.y * viewport.zoom +
-      (canvasHeight - nodeHeight * viewport.zoom) / 2,
+    x: -selectedNode.value.position.x * viewport.zoom + (canvasWidth - nodeWidth * viewport.zoom) / 2,
+    y: -selectedNode.value.position.y * viewport.zoom + (canvasHeight - nodeHeight * viewport.zoom) / 2,
     zoom: viewport.zoom,
   }
-  ;(
-    setViewport as unknown as (
-      v: typeof target,
-      o?: { duration?: number }
-    ) => void
-  )(target, { duration: 320 })
+  ;(setViewport as unknown as (v: typeof target, o?: { duration?: number }) => void)(target, { duration: 320 })
 }
 
 const handlePanelAction = (command: string) => {
@@ -395,19 +469,17 @@ const handlePanelAction = (command: string) => {
           y: source.position.y + 40,
         },
         data: {
-          ...(source.data || {}),
+          ...source.data,
           title: `${source.data?.title || '节点'}_copy`,
-        },
+        } as Node['data'],
       }
       nodes.value = [...nodes.value, duplicated]
       break
     }
     case 'delete': {
       const targetId = selectedNode.value.id
-      nodes.value = nodes.value.filter((node) => node.id !== targetId)
-      edges.value = edges.value.filter(
-        (edge) => edge.source !== targetId && edge.target !== targetId
-      )
+      // 使用 VueFlow 的 removeNodes API，它会自动处理相关边的删除
+      removeNodes([targetId])
       closePanel()
       break
     }
@@ -535,10 +607,44 @@ const handleViewportChange = (viewport: { zoom: number }) => {
   viewportZoom.value = viewport.zoom
 }
 
+const handleControlChange = (mode: ControlMode) => {
+  controlMode.value = mode
+}
+
+const handleZoomIn = () => {
+  zoomIn()
+}
+
+const handleZoomOut = () => {
+  zoomOut()
+}
+
+const handleFitView = () => {
+  fitView()
+}
+
 const handleZoomTo = (zoomPercent: number) => {
   const viewport = getViewport()
   setViewport({ ...viewport, zoom: zoomPercent / 100 })
 }
+
+/**
+ * 获取当前工作流数据
+ */
+const getData = () => {
+  return {
+    nodes: nodes.value,
+    edges: edges.value,
+  }
+}
+
+// 暴露给父组件的方法和数据
+defineExpose({
+  nodes,
+  edges,
+  getData,
+  closePanel,
+})
 </script>
 
 <style scoped>
