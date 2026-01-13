@@ -40,6 +40,15 @@ export enum NodeRunningStatus {
   Exception = 'exception',
 }
 
+export type LastRunInfo = {
+  status?: NodeRunningStatus
+  duration?: number
+  tokens?: number
+  input?: unknown
+  output?: unknown
+  error?: string
+}
+
 export enum VarType {
   string = 'string',
   number = 'number',
@@ -70,6 +79,7 @@ export type CommonNodeType<T = object> = {
   width?: number
   height?: number
   position?: XYPosition
+  lastRun?: LastRunInfo
 } & T
 
 export type CommonEdgeType = {
@@ -234,6 +244,8 @@ export const BLOCK_CLASSIFICATIONS = {
     icon: 'refresh',
   },
 }
+
+export const NO_RUN_NODE_TYPES: BlockEnum[] = [BlockEnum.Start, BlockEnum.End]
 
 export const CUSTOM_NODE = 'custom'
 export const CUSTOM_EDGE = 'custom'

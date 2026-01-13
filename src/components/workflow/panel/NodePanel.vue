@@ -14,7 +14,7 @@
         </div>
       </div>
       <div class="wf-panel__actions">
-        <el-tooltip content="运行此步骤" placement="bottom">
+        <el-tooltip v-if="canRun" content="运行此步骤" placement="bottom">
           <el-button circle text @click="emit('run-step')">
             <el-icon><VideoPlay /></el-icon>
           </el-button>
@@ -68,15 +68,106 @@
 
       <div class="wf-panel__divider" />
 
-      <div class="wf-panel__slot">
-        <slot />
+      <div class="wf-panel__tabs">
+        <el-tabs v-model="activeTab" class="wf-panel__tabs-inner">
+          <el-tab-pane label="设置" name="settings">
+            <div class="wf-panel__slot">
+              <slot />
+            </div>
+          </el-tab-pane>
+          <el-tab-pane label="上次运行" name="last-run">
+            <div class="wf-last-run">
+              <div v-if="!lastRun" class="wf-last-run__empty">暂无运行记录</div>
+              <template v-else>
+                <div class="wf-last-run__summary" :class="statusClass">
+                  <div class="wf-last-run__status">
+                    <span class="wf-last-run__dot"></span>
+                    <span class="wf-last-run__status-text">{{
+                      statusLabel
+                    }}</span>
+                  </div>
+                  <div class="wf-last-run__metric">
+                    <span class="wf-last-run__metric-label">运行时间</span>
+                    <span class="wf-last-run__metric-value">
+                      {{ formatDuration(lastRun.duration) }}
+                    </span>
+                  </div>
+                  <div class="wf-last-run__metric">
+                    <span class="wf-last-run__metric-label">执行人</span>
+                    <span class="wf-last-run__metric-value">
+                      {{ formatTokens(lastRun.tokens) }}
+                    </span>
+                  </div>
+                </div>
+
+                <div class="wf-last-run__block">
+                  <div class="wf-last-run__block-header">
+                    <span>输入</span>
+                    <div class="wf-last-run__actions">
+                      <el-button
+                        circle
+                        text
+                        size="small"
+                        @click="copyText(lastRunInput)"
+                      >
+                        <el-icon><CopyDocument /></el-icon>
+                      </el-button>
+                      <el-button
+                        circle
+                        text
+                        size="small"
+                        @click="openDialog('输入', lastRunInput)"
+                      >
+                        <el-icon><FullScreen /></el-icon>
+                      </el-button>
+                    </div>
+                  </div>
+                  <pre class="wf-last-run__code">{{
+                    lastRunInput || '暂无数据'
+                  }}</pre>
+                </div>
+
+                <div class="wf-last-run__block">
+                  <div class="wf-last-run__block-header">
+                    <span>输出</span>
+                    <div class="wf-last-run__actions">
+                      <el-button
+                        circle
+                        text
+                        size="small"
+                        @click="copyText(lastRunOutput)"
+                      >
+                        <el-icon><CopyDocument /></el-icon>
+                      </el-button>
+                      <el-button
+                        circle
+                        text
+                        size="small"
+                        @click="openDialog('输出', lastRunOutput)"
+                      >
+                        <el-icon><FullScreen /></el-icon>
+                      </el-button>
+                    </div>
+                  </div>
+                  <pre class="wf-last-run__code">{{
+                    lastRunOutput || '暂无数据'
+                  }}</pre>
+                </div>
+              </template>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
       </div>
     </div>
+
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="720px">
+      <pre class="wf-last-run__dialog">{{ dialogContent || '暂无数据' }}</pre>
+    </el-dialog>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   Aim,
   Close,
@@ -97,10 +188,17 @@ import {
   Filter,
   Refresh,
   User,
+  CopyDocument,
+  FullScreen,
 } from '@element-plus/icons-vue'
-import type { Node } from '@/types/workflow'
-import { BLOCK_CLASSIFICATIONS, BlockEnum } from '@/types/workflow'
-import { useNodeData } from '@/composables/useNodeData'
+import type { LastRunInfo, Node } from '../../../types/workflow'
+import {
+  BLOCK_CLASSIFICATIONS,
+  BlockEnum,
+  NO_RUN_NODE_TYPES,
+  NodeRunningStatus,
+} from '../../../types/workflow'
+import { useNodeData } from '../../../composables/useNodeData'
 
 const props = defineProps<{
   node: Node
@@ -156,6 +254,101 @@ const iconComponent = computed(() => {
   }
   return map[icon] || Cpu
 })
+
+const canRun = computed(() => {
+  const nodeType = props.node.data?.type || BlockEnum.Start
+  return !NO_RUN_NODE_TYPES.includes(nodeType)
+})
+
+const activeTab = ref('settings')
+const lastRun = computed<LastRunInfo | null>(() => {
+  return (props.node.data?.lastRun || null) as LastRunInfo | null
+})
+const statusLabel = computed(() => {
+  const status = lastRun.value?.status
+  switch (status) {
+    case NodeRunningStatus.Succeeded:
+      return 'SUCCESS'
+    case NodeRunningStatus.Failed:
+      return 'FAILED'
+    case NodeRunningStatus.Exception:
+      return 'EXCEPTION'
+    case NodeRunningStatus.Running:
+      return 'RUNNING'
+    case NodeRunningStatus.Waiting:
+      return 'WAITING'
+    default:
+      return 'UNKNOWN'
+  }
+})
+const statusClass = computed(() => {
+  const status = lastRun.value?.status
+  if (status === NodeRunningStatus.Succeeded)
+    return 'wf-last-run__summary--success'
+  if (status === NodeRunningStatus.Running)
+    return 'wf-last-run__summary--running'
+  if (status === NodeRunningStatus.Waiting)
+    return 'wf-last-run__summary--waiting'
+  return 'wf-last-run__summary--failed'
+})
+
+const formatDuration = (value?: number) => {
+  if (value === null || value === undefined) return '-'
+  const numeric = typeof value === 'number' ? value : Number(value)
+  if (Number.isNaN(numeric)) return '-'
+  return `${numeric.toFixed(3)}s`
+}
+
+const formatTokens = (value?: number) => {
+  if (value === null || value === undefined) return '-'
+  const numeric = typeof value === 'number' ? value : Number(value)
+  if (Number.isNaN(numeric)) return '-'
+  return `${numeric} Tokens`
+}
+
+const formatJson = (value: unknown) => {
+  if (value === null || value === undefined) return ''
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return JSON.stringify(parsed, null, 2)
+    } catch {
+      return value
+    }
+  }
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
+const lastRunInput = computed(() => formatJson(lastRun.value?.input))
+const lastRunOutput = computed(() => formatJson(lastRun.value?.output))
+
+const dialogVisible = ref(false)
+const dialogTitle = ref('')
+const dialogContent = ref('')
+
+const openDialog = (title: string, content: string) => {
+  dialogTitle.value = title
+  dialogContent.value = content
+  dialogVisible.value = true
+}
+
+const copyText = (content: string) => {
+  if (!content) return
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(content).catch(() => {})
+  }
+}
+
+watch(
+  () => props.node.id,
+  () => {
+    activeTab.value = 'settings'
+  }
+)
 
 const updateField = (key: 'title' | 'desc', value: string) => {
   setInputs({ [key]: value } as Record<string, string>)
@@ -247,9 +440,204 @@ const updateField = (key: 'title' | 'desc', value: string) => {
   flex: 1;
   overflow-y: auto;
 }
+
+.wf-panel__tabs {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.wf-panel__tabs-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.wf-panel__tabs-inner :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+}
+
+.wf-panel__tabs-inner :deep(.el-tab-pane) {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.wf-panel__tabs-inner :deep(.el-tabs__header) {
+  padding: 0 12px;
+}
+
+.wf-panel__tabs-inner :deep(.el-tabs__nav-wrap::after) {
+  background-color: #f3f4f6;
+}
+
+.wf-panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.wf-panel__actions :deep(.el-button) {
+  margin-left: 0;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 18px;
+}
+
+.wf-panel__actions :deep(.el-button:hover) {
+  background: transparent;
+}
+
+.wf-panel__actions :deep(.el-button .el-icon) {
+  font-size: 18px;
+}
+
+.wf-last-run {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.wf-last-run__empty {
+  text-align: center;
+  color: #9ca3af;
+  padding: 40px 0;
+}
+
+.wf-last-run__summary {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr 1fr;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #f8fafc;
+}
+
+.wf-last-run__summary--success {
+  border-color: #86efac;
+  background: #ecfdf3;
+}
+
+.wf-last-run__summary--running {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.wf-last-run__summary--waiting {
+  border-color: #fde68a;
+  background: #fffbeb;
+}
+
+.wf-last-run__summary--failed {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.wf-last-run__summary--success .wf-last-run__status {
+  color: #059669;
+}
+
+.wf-last-run__summary--running .wf-last-run__status {
+  color: #2563eb;
+}
+
+.wf-last-run__summary--waiting .wf-last-run__status {
+  color: #b45309;
+}
+
+.wf-last-run__summary--failed .wf-last-run__status {
+  color: #dc2626;
+}
+
+.wf-last-run__status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.wf-last-run__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.wf-last-run__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wf-last-run__metric-label {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.wf-last-run__metric-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.wf-last-run__block {
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.wf-last-run__block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f3f4f6;
+  font-weight: 600;
+  color: #111827;
+  background: #f9fafb;
+}
+
+.wf-last-run__actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wf-last-run__code {
+  margin: 0;
+  padding: 12px 14px;
+  font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #111827;
+  white-space: pre-wrap;
+  word-break: break-word;
+  height: 200px;
+  overflow: auto;
+  background: #ffffff;
+}
+
+.wf-last-run__dialog {
+  margin: 0;
+  padding: 12px;
+  max-height: 60vh;
+  overflow: auto;
+  font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
 </style>
-.wf-panel__actions { display: flex; align-items: center; gap: 4px; margin-left:
-auto; flex-shrink: 0; } .wf-panel__divider-v { width: 1px; height: 22px;
-background: #e5e7eb; margin: 0 6px; } .wf-panel__actions :deep(.el-button) {
-margin-left: 0; } .wf-panel__actions :deep(.el-button:last-child) { margin-left:
-4px; }

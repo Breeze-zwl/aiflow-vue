@@ -27,7 +27,7 @@
 
 <script setup lang="ts">
 import RemoveButton from './RemoveButton.vue'
-import { VarType } from '@/types/workflow'
+import { VarType } from '../../../../types/workflow'
 
 interface OutputVar {
   variable: string

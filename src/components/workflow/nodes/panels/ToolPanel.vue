@@ -1,6 +1,14 @@
 <template>
   <div>
     <div class="wf-panel-block">
+      <InputParameters
+        :node-id="id"
+        :parameters="inputs.parameters || []"
+        @change="(list) => setInputs({ parameters: list })"
+      />
+
+      <Split />
+
       <Field title="选择工具" required>
         <el-select :model-value="toolName" @change="handleToolSelect">
           <el-option v-for="tool in availableTools" :key="tool.value" :label="tool.label" :value="tool.value" />
@@ -53,22 +61,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, toRef } from 'vue'
 import { Tools } from '@element-plus/icons-vue'
 import Field from '../base/Field.vue'
 import Split from '../base/Split.vue'
 import OutputVars from '../base/OutputVars.vue'
 import VarItem from '../base/VarItem.vue'
+import InputParameters from '../base/InputParameters.vue'
 import VarReferencePicker from '../base/VarReferencePicker.vue'
-import { useNodeData } from '@/composables/useNodeData'
-import type { ToolNodeType } from '@/types/node-config'
+import { useNodeData } from '../../../../composables/useNodeData'
+import type { ToolNodeType } from '../../../../types/node-config'
 
 const props = defineProps<{
   id: string
   data: ToolNodeType
 }>()
 
-const { inputs, setInputs } = useNodeData<ToolNodeType>(props.id, props.data)
+const { inputs, setInputs } = useNodeData<ToolNodeType>(props.id, toRef(props, 'data'))
 
 const availableTools = [
   { label: 'Google 搜索', value: 'google_search', provider: 'google' },

@@ -18,7 +18,7 @@
           v-for="variable in node.vars"
           :key="variable.variable"
           :label="formatLabel(node.nodeId, variable.variable)"
-          :value="formatLabel(node.nodeId, variable.variable)"
+          :value="formatValue(node.nodeId, variable.variable)"
         />
       </el-option-group>
     </template>
@@ -30,7 +30,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { ValueSelector, Var } from '@/types/workflow'
+import type { ValueSelector, Var } from '../../../../types/workflow'
 
 type AvailableVarGroup = {
   nodeId: string
@@ -67,6 +67,11 @@ const formatLabel = (nodeId: string, variable: string) => {
   return props.isShowNodeName === false ? variable : `${nodeId}.${variable}`
 }
 
+// 用于内部存储和选择的值（始终包含 nodeId）
+const formatValue = (nodeId: string, variable: string) => {
+  return `${nodeId}.${variable}`
+}
+
 const handleChange = (value: string) => {
   if (!value) {
     emit('update:modelValue', [])
@@ -79,7 +84,7 @@ const handleChange = (value: string) => {
 
   const varInfo = props.availableVars
     ?.flatMap((group) => group.vars.map((v) => ({ ...v, nodeId: group.nodeId })))
-    .find((v) => formatLabel(v.nodeId, v.variable) === value)
+    .find((v) => formatValue(v.nodeId, v.variable) === value)
 
   emit('change', parts, varInfo)
 }

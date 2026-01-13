@@ -81,12 +81,12 @@
 import { computed, ref, inject, onMounted, onUnmounted } from 'vue'
 import { Handle, Position, useVueFlow } from '@vue-flow/core'
 import type { NodeProps } from '@vue-flow/core'
-import type { CommonNodeType } from '@/types/workflow'
-import { BLOCK_CLASSIFICATIONS, BlockEnum } from '@/types/workflow'
+import type { CommonNodeType } from '../../../types/workflow'
+import { BLOCK_CLASSIFICATIONS, BlockEnum } from '../../../types/workflow'
 import {
   addNodeFromSourceKey,
   type AddNodeFromSource,
-} from '@/composables/useNodeData'
+} from '../../../composables/useNodeData'
 import NodeSelectorPopup from './NodeSelectorPopup.vue'
 import {
   VideoPlay,
@@ -367,11 +367,12 @@ onUnmounted(() => {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translate(-51%, -51%);
   color: #ffffff;
-  font-size: 16px;
-  font-weight: bold;
+  font-size: 18px;
+  font-weight: 400;
   line-height: 1;
+  font-family: Arial, sans-serif;
 }
 
 .wf-handle--as-plus:hover {

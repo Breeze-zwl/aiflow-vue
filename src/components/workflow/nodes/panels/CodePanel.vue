@@ -1,6 +1,14 @@
 <template>
   <div>
     <div class="wf-panel-block">
+      <InputParameters
+        :node-id="id"
+        :parameters="inputs.parameters || []"
+        @change="(list) => setInputs({ parameters: list })"
+      />
+
+      <Split />
+
       <Field title="输入变量">
         <template #operations>
           <AddButton @click="handleAddVariable" />
@@ -59,26 +67,27 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, toRef } from 'vue'
 import Field from '../base/Field.vue'
 import Split from '../base/Split.vue'
+import InputParameters from '../base/InputParameters.vue'
 import VarList from '../base/VarList.vue'
 import AddButton from '../base/AddButton.vue'
 import RemoveButton from '../base/RemoveButton.vue'
 import CodeEditor from '../base/CodeEditor.vue'
 import TypeSelector from '../base/TypeSelector.vue'
-import { useNodeData } from '@/composables/useNodeData'
-import type { CodeNodeType } from '@/types/node-config'
-import { CodeLanguage } from '@/types/node-config'
-import { VarType } from '@/types/workflow'
-import type { Variable } from '@/types/workflow'
+import { useNodeData } from '../../../../composables/useNodeData'
+import type { CodeNodeType } from '../../../../types/node-config'
+import { CodeLanguage } from '../../../../types/node-config'
+import { VarType } from '../../../../types/workflow'
+import type { Variable } from '../../../../types/workflow'
 
 const props = defineProps<{
   id: string
   data: CodeNodeType
 }>()
 
-const { inputs, setInputs } = useNodeData<CodeNodeType>(props.id, props.data)
+const { inputs, setInputs } = useNodeData<CodeNodeType>(props.id, toRef(props, 'data'))
 
 const codeLanguages = [
   { label: 'Python3', value: CodeLanguage.python3 },

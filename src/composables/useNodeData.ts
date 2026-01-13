@@ -1,5 +1,6 @@
-import { computed, inject } from 'vue'
-import type { BlockEnum } from '@/types/workflow'
+import { computed, inject, unref } from 'vue'
+import type { Ref } from 'vue'
+import type { BlockEnum } from '../types/workflow'
 
 export type UpdateNodeData = (nodeId: string, data: Record<string, unknown>) => void
 export type AddNodeFromSource = (sourceNodeId: string, nodeType: BlockEnum) => void
@@ -7,10 +8,10 @@ export type AddNodeFromSource = (sourceNodeId: string, nodeType: BlockEnum) => v
 export const updateNodeDataKey = Symbol('update-node-data')
 export const addNodeFromSourceKey = Symbol('add-node-from-source')
 
-export const useNodeData = <T extends Record<string, unknown>>(id: string, data: T) => {
+export const useNodeData = <T extends Record<string, unknown>>(id: string, data: T | Ref<T>) => {
   const updateNodeData = inject<UpdateNodeData | null>(updateNodeDataKey, null)
 
-  const inputs = computed(() => data)
+  const inputs = computed(() => unref(data))
 
   const setInputs = (patch: Partial<T>) => {
     if (!updateNodeData) {

@@ -1,5 +1,8 @@
 <template>
-  <div class="wf-node-selector" :class="{ 'wf-node-selector--collapsed': isCollapsed }">
+  <div
+    class="wf-node-selector"
+    :class="{ 'wf-node-selector--collapsed': isCollapsed }"
+  >
     <div class="wf-node-selector__header">
       <h3 v-if="!isCollapsed" class="wf-node-selector__title">节点库</h3>
       <el-button
@@ -13,7 +16,11 @@
     </div>
 
     <el-scrollbar v-if="!isCollapsed" class="wf-node-selector__body">
-      <div class="wf-node-selector__section" v-for="category in nodeCategories" :key="category.title">
+      <div
+        class="wf-node-selector__section"
+        v-for="category in visibleNodeCategories"
+        :key="category.title"
+      >
         <div class="wf-node-selector__section-title">{{ category.title }}</div>
         <div class="wf-node-selector__list">
           <div
@@ -32,7 +39,9 @@
                 <component :is="iconMap[type]" />
               </el-icon>
             </div>
-            <span class="wf-node-selector__label">{{ BLOCK_CLASSIFICATIONS[type].title }}</span>
+            <span class="wf-node-selector__label">{{
+              BLOCK_CLASSIFICATIONS[type].title
+            }}</span>
           </div>
         </div>
       </div>
@@ -41,10 +50,29 @@
 </template>
 
 <script setup lang="ts">
-import { Menu, VideoPlay, VideoPause, Cpu, Search, Connection, EditPen, Link, ChatDotSquare, Tools, Document, List, Grid, Refresh, User, Filter, Files } from '@element-plus/icons-vue'
-import { BlockEnum, BLOCK_CLASSIFICATIONS } from '@/types/workflow'
+import {
+  Menu,
+  VideoPlay,
+  VideoPause,
+  Cpu,
+  Search,
+  Connection,
+  EditPen,
+  Link,
+  ChatDotSquare,
+  Tools,
+  Document,
+  List,
+  Grid,
+  Refresh,
+  User,
+  Filter,
+  Files,
+} from '@element-plus/icons-vue'
+import { BlockEnum, BLOCK_CLASSIFICATIONS } from '../../../types/workflow'
+import { nodeCategories } from '../node-categories'
 
-const props = defineProps<{
+defineProps<{
   isCollapsed?: boolean
 }>()
 
@@ -88,44 +116,7 @@ const iconMap: Record<string, any> = {
   [BlockEnum.Loop]: Refresh,
 }
 
-const nodeCategories = [
-  {
-    title: '基础节点',
-    nodes: [
-      BlockEnum.Start,
-      BlockEnum.LLM,
-      BlockEnum.Code,
-      BlockEnum.KnowledgeRetrieval,
-      BlockEnum.QuestionClassifier,
-      BlockEnum.Answer,
-      BlockEnum.End,
-    ],
-  },
-  {
-    title: '逻辑控制',
-    nodes: [
-      BlockEnum.IfElse,
-      BlockEnum.Iteration,
-      BlockEnum.Loop,
-      BlockEnum.VariableAssigner,
-    ],
-  },
-  {
-    title: '数据处理',
-    nodes: [
-      BlockEnum.TemplateTransform,
-      BlockEnum.ParameterExtractor,
-      BlockEnum.HttpRequest,
-    ],
-  },
-  {
-    title: '工具',
-    nodes: [
-      BlockEnum.Tool,
-      BlockEnum.Agent,
-    ],
-  },
-]
+const visibleNodeCategories = nodeCategories
 </script>
 
 <style scoped>
@@ -133,7 +124,7 @@ const nodeCategories = [
   display: flex;
   flex-direction: column;
   height: 100%;
-  width: 260px;
+  width: 240px;
   background: rgba(249, 250, 251, 0.95);
   border-right: 1px solid #e5e7eb;
   transition: width 0.3s ease;

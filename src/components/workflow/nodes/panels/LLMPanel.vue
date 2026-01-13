@@ -1,22 +1,30 @@
 <template>
   <div>
     <div class="wf-panel-block">
+      <InputParameters
+        :node-id="id"
+        :parameters="inputs.parameters || []"
+        @change="(list) => setInputs({ parameters: list })"
+      />
+
+      <Split />
+
       <Field title="模型配置" required>
         <div class="wf-grid">
           <div>
-            <label class="wf-field-label">提供商</label>
-            <el-select :model-value="model.provider" @change="(value: string) => handleModelChanged({ provider: value })">
-              <el-option v-for="option in providerOptions" :key="option.value" :label="option.label" :value="option.value" />
-            </el-select>
-          </div>
-          <div>
             <label class="wf-field-label">模型</label>
-            <el-select :model-value="model.name" @change="(value: string) => handleModelChanged({ name: value })">
-              <el-option v-for="option in modelOptions" :key="option.value" :label="option.label" :value="option.value" />
+            <el-select
+              :model-value="model.name"
+              @change="(value: string) => handleModelChanged({ name: value })"
+            >
+              <el-option
+                v-for="option in modelOptions"
+                :key="option.value"
+                :label="option.label"
+                :value="option.value"
+              />
             </el-select>
           </div>
-        </div>
-        <div class="wf-grid">
           <div>
             <label class="wf-field-label">Temperature</label>
             <el-input
@@ -28,29 +36,32 @@
               @input="(value: string) => handleCompletionParamsChange({ temperature: Number(value) })"
             />
           </div>
+        </div>
+        <div class="wf-grid">
           <div>
-            <label class="wf-field-label">Max Tokens</label>
+            <label class="wf-field-label">Top P</label>
             <el-input
               type="number"
-              :model-value="model.completion_params?.max_tokens ?? 2048"
-              min="1"
-              max="128000"
-              @input="(value: string) => handleCompletionParamsChange({ max_tokens: Number(value) })"
+              :model-value="model.completion_params?.top_p ?? 1"
+              min="0"
+              max="1"
+              step="0.05"
+              @input="(value: string) => handleCompletionParamsChange({ top_p: Number(value) })"
+            />
+          </div>
+          <div>
+            <label class="wf-field-label">Top K</label>
+            <el-input
+              type="number"
+              :model-value="model.completion_params?.top_k ?? 50"
+              min="0"
+              max="200"
+              step="1"
+              @input="(value: string) => handleCompletionParamsChange({ top_k: Number(value) })"
             />
           </div>
         </div>
       </Field>
-
-      <Field title="上下文" tooltip="选择作为上下文的变量">
-        <VarReferencePicker
-          :node-id="id"
-          :model-value="inputs.context?.variable_selector || []"
-          placeholder="选择上下文变量"
-          @change="(value: string[] | string) => handleContextChange({ enabled: true, variable_selector: value as string[] })"
-        />
-      </Field>
-
-      <Split />
 
       <Field title="系统提示词" tooltip="设置 AI 的角色和行为规范">
         <el-input
@@ -61,70 +72,98 @@
           @input="(value: string) => handleSystemPromptChange(value)"
         />
       </Field>
-
-      <Field title="用户提示词" tooltip="定义用户输入的模板，可使用变量">
-        <el-input
-          type="textarea"
-          :rows="4"
-          placeholder="请根据以下内容回答问题：{{context}}\n\n问题：{{query}}"
-          :model-value="userPrompt"
-          @input="(value: string) => handleUserPromptChange(value)"
-        />
-        <p class="wf-hint-text">使用 {{ '{' }}{{ '变量名' }}{{ '}' }} 引用上游节点的输出</p>
-      </Field>
-
       <Split />
 
-      <Field title="高级设置">
-        <div class="wf-toggle-row">
-          <div>
-            <p class="wf-toggle-title">启用对话记忆</p>
-            <p class="wf-muted">保留历史对话上下文</p>
-          </div>
-          <el-switch
-            :model-value="inputs.memory?.window?.enabled || false"
-            @change="(value: boolean) => handleMemoryChange({ ...inputs.memory, window: { enabled: value, size: inputs.memory?.window?.size || 10 } })"
-          />
+      <Field title="输出变量" required>
+        <div class="wf-output-row">
+          <el-select
+            :model-value="outputType"
+            placeholder="选择输出类型"
+            @change="handleOutputTypeChange"
+          >
+            <el-option label="文本" value="text" />
+            <el-option label="JSON" value="json" />
+          </el-select>
+          <el-button
+            v-if="outputType"
+            text
+            size="small"
+            @click="handleOutputEdit"
+          >
+            编辑
+          </el-button>
         </div>
-        <div class="wf-toggle-row">
-          <div>
-            <p class="wf-toggle-title">启用视觉能力</p>
-            <p class="wf-muted">支持图片输入分析</p>
-          </div>
-          <el-switch
-            :model-value="inputs.vision?.enabled || false"
-            @change="(value: boolean) => handleVisionChange(value)"
-          />
+        <div v-if="outputSummary" class="wf-output-summary">
+          <span class="wf-output-summary__name">{{ outputSummary.name }}</span>
+          <span class="wf-output-summary__value">{{
+            outputSummary.defaultValue
+          }}</span>
         </div>
       </Field>
+      <div class="wf-output-spacer"></div>
     </div>
 
-    <Split />
-
-    <OutputVars>
-      <VarItem name="text" type="string" description="模型生成的文本内容" />
-      <VarItem name="reasoning_content" type="string" description="推理过程内容（如支持）" />
-      <VarItem name="usage" type="object" description="Token 使用量统计" />
-    </OutputVars>
+    <el-dialog
+      v-model="outputDialogVisible"
+      :title="outputDialogTitle"
+      width="720px"
+    >
+      <template v-if="outputType === 'text'">
+        <div class="wf-output-form">
+          <div class="wf-output-field">
+            <label class="wf-field-label">变量名</label>
+            <el-input v-model="outputForm.name" placeholder="output" />
+          </div>
+          <div class="wf-output-field">
+            <label class="wf-field-label">变量类型</label>
+            <el-input :model-value="outputForm.dataType" disabled />
+          </div>
+          <div class="wf-output-field">
+            <label class="wf-field-label">描述</label>
+            <el-input
+              v-model="outputForm.description"
+              placeholder="请输入变量的作用的描述语句"
+            />
+          </div>
+          <div class="wf-output-field">
+            <label class="wf-field-label">默认值</label>
+            <el-input v-model="outputForm.defaultValue" placeholder="默认值" />
+          </div>
+        </div>
+      </template>
+      <template v-else>
+        <JsonOutputEditor v-model="jsonFields" />
+      </template>
+      <template #footer>
+        <el-button @click="outputDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleOutputSave">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive, ref, toRef } from 'vue'
 import Field from '../base/Field.vue'
 import Split from '../base/Split.vue'
-import OutputVars from '../base/OutputVars.vue'
-import VarItem from '../base/VarItem.vue'
-import VarReferencePicker from '../base/VarReferencePicker.vue'
-import { useNodeData } from '@/composables/useNodeData'
-import type { LLMNodeType, ModelConfig, PromptItem } from '@/types/node-config'
+import InputParameters from '../base/InputParameters.vue'
+import JsonOutputEditor from '../base/JsonOutputEditor.vue'
+import { useNodeData } from '../../../../composables/useNodeData'
+import type {
+  LLMNodeType,
+  ModelConfig,
+  PromptItem,
+} from '../../../../types/node-config'
 
 const props = defineProps<{
   id: string
   data: LLMNodeType
 }>()
 
-const { inputs, setInputs } = useNodeData<LLMNodeType>(props.id, props.data)
+const { inputs, setInputs } = useNodeData<LLMNodeType>(
+  props.id,
+  toRef(props, 'data')
+)
 
 const modelOptions = [
   { label: 'GPT-4', value: 'gpt-4' },
@@ -139,16 +178,14 @@ const modelOptions = [
   { label: 'DeepSeek Chat', value: 'deepseek-chat' },
 ]
 
-const providerOptions = [
-  { label: 'OpenAI', value: 'openai' },
-  { label: 'Anthropic', value: 'anthropic' },
-  { label: 'Qwen', value: 'qwen' },
-  { label: 'DeepSeek', value: 'deepseek' },
-  { label: 'Azure OpenAI', value: 'azure' },
-]
-
 const model = computed<ModelConfig>(() => {
-  return inputs.value.model || { provider: 'openai', name: 'gpt-4', completion_params: {} }
+  return (
+    inputs.value.model || {
+      provider: 'openai',
+      name: 'gpt-4',
+      completion_params: {},
+    }
+  )
 })
 
 const promptTemplate = computed<PromptItem[]>(() => {
@@ -164,8 +201,30 @@ const promptTemplate = computed<PromptItem[]>(() => {
   ]
 })
 
-const systemPrompt = computed(() => promptTemplate.value.find((item) => item.role === 'system')?.text || '')
-const userPrompt = computed(() => promptTemplate.value.find((item) => item.role === 'user')?.text || '')
+const systemPrompt = computed(
+  () => promptTemplate.value.find((item) => item.role === 'system')?.text || ''
+)
+const outputType = computed(() => inputs.value.output_type || '')
+const outputConfig = computed(() => inputs.value.output_variable || {})
+const outputDialogVisible = ref(false)
+const outputDialogTitle = computed(() =>
+  outputType.value === 'json' ? 'JSON 输出' : '文本输出'
+)
+const outputForm = reactive({
+  name: '',
+  dataType: 'String',
+  description: '',
+  defaultValue: '',
+})
+const jsonFields = ref<any[]>([])
+const outputSummary = computed(() => {
+  const config = outputConfig.value || {}
+  if (!config.name && !config.defaultValue) return null
+  return {
+    name: config.name || 'output',
+    defaultValue: config.defaultValue || '-',
+  }
+})
 
 const handleModelChanged = (patch: Partial<ModelConfig>) => {
   setInputs({
@@ -192,23 +251,6 @@ const handlePromptChange = (prompt: PromptItem[] | PromptItem) => {
   setInputs({ prompt_template: prompt })
 }
 
-const handleMemoryChange = (memory: LLMNodeType['memory']) => {
-  setInputs({ memory })
-}
-
-const handleVisionChange = (enabled: boolean) => {
-  setInputs({
-    vision: {
-      ...inputs.value.vision,
-      enabled,
-    },
-  })
-}
-
-const handleContextChange = (context: LLMNodeType['context']) => {
-  setInputs({ context })
-}
-
 const handleSystemPromptChange = (text: string) => {
   const updated = promptTemplate.value.map((item) =>
     item.role === 'system' ? { ...item, text } : item
@@ -219,14 +261,61 @@ const handleSystemPromptChange = (text: string) => {
   handlePromptChange(updated)
 }
 
-const handleUserPromptChange = (text: string) => {
-  const updated = promptTemplate.value.map((item) =>
-    item.role === 'user' ? { ...item, text } : item
-  )
-  if (!updated.find((item) => item.role === 'user')) {
-    updated.push({ role: 'user', text })
+const syncOutputForm = () => {
+  const current = outputConfig.value || {}
+  outputForm.name = current.name || 'output'
+  outputForm.dataType = current.dataType || 'String'
+  outputForm.description = current.description || ''
+  outputForm.defaultValue = current.defaultValue || ''
+}
+
+const openOutputDialog = (nextType?: string) => {
+  const type = nextType || outputType.value
+  if (!type) return
+  if (type === 'text') {
+    syncOutputForm()
+  } else if (type === 'json') {
+    jsonFields.value = Array.isArray(outputConfig.value?.children)
+      ? JSON.parse(JSON.stringify(outputConfig.value.children))
+      : []
   }
-  handlePromptChange(updated)
+  outputDialogVisible.value = true
+}
+
+const handleOutputTypeChange = (value: 'text' | 'json') => {
+  setInputs({ output_type: value })
+  openOutputDialog(value)
+}
+
+const handleOutputEdit = () => {
+  openOutputDialog()
+}
+
+const handleOutputSave = () => {
+  if (outputType.value === 'text') {
+    setInputs({
+      output_variable: {
+        name: outputForm.name,
+        dataType: outputForm.dataType,
+        description: outputForm.description,
+        defaultValue: outputForm.defaultValue,
+      },
+    })
+    jsonFields.value = []
+  } else if (outputType.value === 'json') {
+    setInputs({
+      output_variable: {
+        name: outputConfig.value?.name || 'json',
+        dataType: 'Object',
+        children: jsonFields.value,
+      },
+    })
+    outputForm.name = ''
+    outputForm.dataType = 'String'
+    outputForm.description = ''
+    outputForm.defaultValue = ''
+  }
+  outputDialogVisible.value = false
 }
 </script>
 
@@ -251,28 +340,55 @@ const handleUserPromptChange = (text: string) => {
   color: #6b7280;
 }
 
-.wf-hint-text {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #9ca3af;
+.wf-output-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.wf-toggle-row {
+.wf-output-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wf-output-empty {
+  min-height: 120px;
+}
+
+.wf-output-summary {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.wf-output-summary__name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.wf-output-summary__value {
+  color: #64748b;
+}
+
+.wf-output-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
+  gap: 8px;
 }
 
-.wf-toggle-title {
-  margin: 0;
-  font-size: 13px;
-  color: #374151;
+.wf-output-row :deep(.el-select) {
+  flex: 1;
 }
 
-.wf-muted {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: #9ca3af;
+.wf-output-spacer {
+  height: 30px;
+  border-top: 1px solid var(--el-border-color);
 }
 </style>

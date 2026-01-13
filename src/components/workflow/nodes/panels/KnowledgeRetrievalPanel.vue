@@ -1,6 +1,14 @@
 <template>
   <div>
     <div class="wf-panel-block">
+      <InputParameters
+        :node-id="id"
+        :parameters="inputs.parameters || []"
+        @change="(list) => setInputs({ parameters: list })"
+      />
+
+      <Split />
+
       <Field title="查询变量" required tooltip="选择用于检索的查询内容">
         <VarReferencePicker
           :node-id="id"
@@ -97,21 +105,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, toRef } from 'vue'
 import Field from '../base/Field.vue'
 import Split from '../base/Split.vue'
+import InputParameters from '../base/InputParameters.vue'
 import VarReferencePicker from '../base/VarReferencePicker.vue'
 import OutputVars from '../base/OutputVars.vue'
 import VarItem from '../base/VarItem.vue'
-import { useNodeData } from '@/composables/useNodeData'
-import type { KnowledgeRetrievalNodeType } from '@/types/node-config'
+import { useNodeData } from '../../../../composables/useNodeData'
+import type { KnowledgeRetrievalNodeType } from '../../../../types/node-config'
 
 const props = defineProps<{
   id: string
   data: KnowledgeRetrievalNodeType
 }>()
 
-const { inputs, setInputs } = useNodeData<KnowledgeRetrievalNodeType>(props.id, props.data)
+const { inputs, setInputs } = useNodeData<KnowledgeRetrievalNodeType>(props.id, toRef(props, 'data'))
 
 const retrievalModeOptions = [
   { label: '单知识库', value: 'single' },

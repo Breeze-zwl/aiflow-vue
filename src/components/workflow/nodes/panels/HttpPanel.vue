@@ -1,6 +1,14 @@
 <template>
   <div>
     <div class="wf-panel-block">
+      <InputParameters
+        :node-id="id"
+        :parameters="inputs.parameters || []"
+        @change="(list) => setInputs({ parameters: list })"
+      />
+
+      <Split />
+
       <Field title="请求配置" required>
         <div class="wf-inline">
           <el-select
@@ -130,24 +138,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, toRef } from 'vue'
 import Field from '../base/Field.vue'
 import Split from '../base/Split.vue'
+import InputParameters from '../base/InputParameters.vue'
 import VarList from '../base/VarList.vue'
 import AddButton from '../base/AddButton.vue'
 import OutputVars from '../base/OutputVars.vue'
 import VarItem from '../base/VarItem.vue'
-import { useNodeData } from '@/composables/useNodeData'
-import type { HttpNodeType } from '@/types/node-config'
-import { Method, BodyType, AuthorizationType } from '@/types/node-config'
-import type { Variable } from '@/types/workflow'
+import { useNodeData } from '../../../../composables/useNodeData'
+import type { HttpNodeType } from '../../../../types/node-config'
+import { Method, BodyType, AuthorizationType } from '../../../../types/node-config'
+import type { Variable } from '../../../../types/workflow'
 
 const props = defineProps<{
   id: string
   data: HttpNodeType
 }>()
 
-const { inputs, setInputs } = useNodeData<HttpNodeType>(props.id, props.data)
+const { inputs, setInputs } = useNodeData<HttpNodeType>(props.id, toRef(props, 'data'))
 
 const methodOptions = [
   { label: 'GET', value: Method.get },

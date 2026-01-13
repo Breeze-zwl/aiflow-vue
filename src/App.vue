@@ -30,7 +30,6 @@
         </el-button>
       </div>
       <div class="app-header__right">
-        <el-button type="primary">保存</el-button>
       </div>
     </header>
 
@@ -39,8 +38,12 @@
         :key="activeDemo"
         :initial-nodes="nodes"
         :initial-edges="edges"
-        @nodes-change="handleNodesChange"
-        @edges-change="handleEdgesChange"
+        :preview-messages="previewMessages"
+        :preview-loading="previewLoading"
+        @save="handleSave"
+        @preview="handlePreview"
+        @preview-send="handlePreviewSend"
+        @preview-reset="handlePreviewReset"
       />
     </main>
 
@@ -57,33 +60,47 @@
 import { computed, ref } from 'vue'
 import Workflow from './components/workflow/Workflow.vue'
 import type { Edge, Node } from './types/workflow'
-import {
-  simpleWorkflowEdges,
-  simpleWorkflowNodes,
-  complexWorkflowEdges,
-  complexWorkflowNodes,
-} from './mocks/workflow-data'
+import { mockEdges, mockNodes } from './mocks/workflow-data'
 
 const activeDemo = ref<'simple' | 'complex' | 'blank'>('simple')
 
 const nodes = computed<Node[]>(() => {
   if (activeDemo.value === 'blank') return []
-  if (activeDemo.value === 'complex') return complexWorkflowNodes
-  return simpleWorkflowNodes
+  return mockNodes
 })
 
 const edges = computed<Edge[]>(() => {
   if (activeDemo.value === 'blank') return []
-  if (activeDemo.value === 'complex') return complexWorkflowEdges
-  return simpleWorkflowEdges
+  return mockEdges
 })
 
-const handleNodesChange = (nextNodes: Node[]) => {
-  console.log('Nodes changed:', nextNodes.length)
+const previewMessages = ref<Array<{ role: 'user' | 'bot'; content: string; model?: string; workflow?: string }>>([])
+const previewLoading = ref(false)
+
+const handleSave = (data: { nodes: Node[]; edges: Edge[] }) => {
+  console.log('Save workflow:', data)
 }
 
-const handleEdgesChange = (nextEdges: Edge[]) => {
-  console.log('Edges changed:', nextEdges.length)
+const handlePreview = (data: { nodes: Node[]; edges: Edge[] }) => {
+  console.log('Preview workflow:', data)
+}
+
+const handlePreviewSend = async (payload: { message: string; params: Record<string, any>; data: { nodes: Node[]; edges: Edge[] } }) => {
+  previewLoading.value = true
+  previewMessages.value = [
+    ...previewMessages.value,
+    { role: 'user', content: payload.message },
+  ]
+  // 简化版：模拟返回
+  previewMessages.value = [
+    ...previewMessages.value,
+    { role: 'bot', content: '收到请求，接口逻辑请在业务中实现。' },
+  ]
+  previewLoading.value = false
+}
+
+const handlePreviewReset = () => {
+  previewMessages.value = []
 }
 </script>
 

@@ -1,14 +1,42 @@
-import type { CommonNodeType, InputVar, ValueSelector, Variable, VarType } from '@/types/workflow'
+import type { CommonNodeType, ValueSelector, Variable, VarType } from './workflow'
 
 export type StartNodeType = CommonNodeType & {
-  variables: InputVar[]
+  parameters: Parameter[]
 }
 
-export type AnswerNodeType = CommonNodeType & {
+export type Parameter = {
+  id?: string
+  name?: string
+  nameDisabled?: boolean
+  dataType?: string
+  dataTypeDisabled?: boolean
+  contentType?: string
+  ref?: string
+  refType?: string
+  value?: string
+  description?: string
+  required?: boolean
+  defaultValue?: string
+  deleteDisabled?: boolean
+  addChildDisabled?: boolean
+  children?: Parameter[]
+  enums?: string[]
+  formType?: string
+  formLabel?: string
+  formDescription?: string
+  formPlaceholder?: string
+  formAttrs?: string
+}
+
+type NodeWithParameters = CommonNodeType & {
+  parameters?: Parameter[]
+}
+
+export type AnswerNodeType = NodeWithParameters & {
   answer: string
 }
 
-export type EndNodeType = CommonNodeType & {
+export type EndNodeType = NodeWithParameters & {
   outputs: Variable[]
 }
 
@@ -40,11 +68,32 @@ export interface VisionSetting {
   detail?: 'low' | 'high' | 'auto'
 }
 
-export type LLMNodeType = CommonNodeType & {
+export type LLMNodeType = NodeWithParameters & {
   model: ModelConfig
   prompt_template: PromptItem[] | PromptItem
   prompt_config?: {
     jinja2_variables?: Variable[]
+  }
+  output_type?: 'text' | 'json'
+  output_variable?: {
+    name?: string
+    dataType?: string
+    description?: string
+    defaultValue?: string
+    children?: Array<{
+      id: string
+      name?: string
+      dataType?: string
+      description?: string
+      defaultValue?: string
+      children?: Array<{
+        id: string
+        name?: string
+        dataType?: string
+        description?: string
+        defaultValue?: string
+      }>
+    }>
   }
   memory?: Memory
   context?: {
@@ -64,7 +113,7 @@ export enum CodeLanguage {
   json = 'json',
 }
 
-export type CodeNodeType = CommonNodeType & {
+export type CodeNodeType = NodeWithParameters & {
   variables: Variable[]
   code_language: CodeLanguage
   code: string
@@ -114,7 +163,7 @@ export type Timeout = {
   write?: number
 }
 
-export type HttpNodeType = CommonNodeType & {
+export type HttpNodeType = NodeWithParameters & {
   variables: Variable[]
   method: Method
   url: string
@@ -125,7 +174,7 @@ export type HttpNodeType = CommonNodeType & {
   timeout: Timeout
 }
 
-export type KnowledgeRetrievalNodeType = CommonNodeType & {
+export type KnowledgeRetrievalNodeType = NodeWithParameters & {
   query_variable_selector: ValueSelector
   dataset_ids: string[]
   retrieval_mode: 'single' | 'multiple'
@@ -172,7 +221,7 @@ export type ConditionCase = {
   conditions: Condition[]
 }
 
-export type IfElseNodeType = CommonNodeType & {
+export type IfElseNodeType = NodeWithParameters & {
   cases: ConditionCase[]
 }
 
@@ -182,7 +231,7 @@ export type ClassItem = {
   description?: string
 }
 
-export type QuestionClassifierNodeType = CommonNodeType & {
+export type QuestionClassifierNodeType = NodeWithParameters & {
   query_variable_selector: ValueSelector
   classes: ClassItem[]
   model?: {
@@ -192,12 +241,12 @@ export type QuestionClassifierNodeType = CommonNodeType & {
   instruction?: string
 }
 
-export type VariableAssignerNodeType = CommonNodeType & {
+export type VariableAssignerNodeType = NodeWithParameters & {
   variables: Variable[]
   output_type: 'object' | 'array' | 'string'
 }
 
-export type TemplateTransformNodeType = CommonNodeType & {
+export type TemplateTransformNodeType = NodeWithParameters & {
   variables: Variable[]
   template: string
 }
@@ -211,7 +260,7 @@ export type ToolParameter = {
   variable_selector?: string[]
 }
 
-export type ToolNodeType = CommonNodeType & {
+export type ToolNodeType = NodeWithParameters & {
   provider_id: string
   provider_name: string
   tool_name: string

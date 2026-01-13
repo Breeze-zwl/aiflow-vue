@@ -135,7 +135,7 @@ import {
   Document,
 } from '@element-plus/icons-vue'
 import { computed } from 'vue'
-import { ControlMode } from '@/types/workflow'
+import { ControlMode } from '../../../types/workflow'
 
 const props = defineProps<{
   controlMode: ControlMode

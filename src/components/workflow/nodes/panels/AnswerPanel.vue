@@ -1,5 +1,13 @@
 <template>
   <div class="wf-panel-block">
+    <InputParameters
+      :node-id="id"
+      :parameters="inputs.parameters || []"
+      @change="(list) => setInputs({ parameters: list })"
+    />
+
+    <Split />
+
     <Field title="回复内容" required tooltip="配置直接回复给用户的内容，可使用变量">
       <el-input
         type="textarea"
@@ -20,17 +28,19 @@
 </template>
 
 <script setup lang="ts">
+import { toRef } from 'vue'
 import Field from '../base/Field.vue'
 import Split from '../base/Split.vue'
-import { useNodeData } from '@/composables/useNodeData'
-import type { AnswerNodeType } from '@/types/node-config'
+import InputParameters from '../base/InputParameters.vue'
+import { useNodeData } from '../../../../composables/useNodeData'
+import type { AnswerNodeType } from '../../../../types/node-config'
 
 const props = defineProps<{
   id: string
   data: AnswerNodeType
 }>()
 
-const { inputs, setInputs } = useNodeData<AnswerNodeType>(props.id, props.data)
+const { inputs, setInputs } = useNodeData<AnswerNodeType>(props.id, toRef(props, 'data'))
 
 const handleAnswerChange = (value: string) => {
   setInputs({ answer: value })

@@ -11,9 +11,10 @@
       <VarReferencePicker
         :node-id="nodeId"
         :readonly="readonly"
-        :is-show-node-name="true"
+        :is-show-node-name="false"
         :available-vars="availableVars"
         :model-value="variable.value_selector || []"
+        placeholder="选择参数"
         @update:model-value="(value) => handleVarReferenceChange(index, value)"
         @change="(value, varInfo) => handleVarReferenceChange(index, value, varInfo)"
         class="wf-var-picker"
@@ -27,7 +28,7 @@
 <script setup lang="ts">
 import VarReferencePicker from './VarReferencePicker.vue'
 import RemoveButton from './RemoveButton.vue'
-import type { Variable, ValueSelector, Var } from '@/types/workflow'
+import type { Variable, ValueSelector, Var } from '../../../../types/workflow'
 
 type AvailableVarGroup = {
   nodeId: string

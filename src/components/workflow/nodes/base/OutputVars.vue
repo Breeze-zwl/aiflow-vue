@@ -33,12 +33,18 @@ const title = props.title || '输出变量'
   font-size: 13px;
   font-weight: 600;
   color: #374151;
+  padding-left: 16px;
+  padding-right: 16px;
+}
+
+.wf-output-vars :deep(.el-collapse-item__wrap) {
+  padding: 0 16px;
 }
 
 .wf-output-vars__content {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 0 6px 12px;
+  padding-bottom: 12px;
 }
 </style>

@@ -29,7 +29,7 @@
 import { computed } from 'vue'
 import { BaseEdge, EdgeLabelRenderer, getBezierPath, useVueFlow } from '@vue-flow/core'
 import type { EdgeProps } from '@vue-flow/core'
-import type { CommonEdgeType } from '@/types/workflow'
+import type { CommonEdgeType } from '../../../types/workflow'
 import { Delete } from '@element-plus/icons-vue'
 
 const props = defineProps<EdgeProps<CommonEdgeType>>()

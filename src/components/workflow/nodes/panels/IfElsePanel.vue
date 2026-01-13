@@ -1,5 +1,13 @@
 <template>
   <div class="wf-panel-block">
+    <InputParameters
+      :node-id="id"
+      :parameters="inputs.parameters || []"
+      @change="(list) => setInputs({ parameters: list })"
+    />
+
+    <Split />
+
     <Field title="条件分支">
       <template #operations>
         <AddButton @click="handleAddCase" />
@@ -75,23 +83,24 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, toRef } from 'vue'
 import { v4 as uuid } from 'uuid'
 import Field from '../base/Field.vue'
 import Split from '../base/Split.vue'
+import InputParameters from '../base/InputParameters.vue'
 import AddButton from '../base/AddButton.vue'
 import RemoveButton from '../base/RemoveButton.vue'
 import VarReferencePicker from '../base/VarReferencePicker.vue'
-import { useNodeData } from '@/composables/useNodeData'
-import type { IfElseNodeType, ConditionCase, Condition } from '@/types/node-config'
-import { ComparisonOperator, LogicalOperator } from '@/types/node-config'
+import { useNodeData } from '../../../../composables/useNodeData'
+import type { IfElseNodeType, ConditionCase, Condition } from '../../../../types/node-config'
+import { ComparisonOperator, LogicalOperator } from '../../../../types/node-config'
 
 const props = defineProps<{
   id: string
   data: IfElseNodeType
 }>()
 
-const { inputs, setInputs } = useNodeData<IfElseNodeType>(props.id, props.data)
+const { inputs, setInputs } = useNodeData<IfElseNodeType>(props.id, toRef(props, 'data'))
 
 const logicalOperatorOptions = [
   { label: 'AND', value: LogicalOperator.and },

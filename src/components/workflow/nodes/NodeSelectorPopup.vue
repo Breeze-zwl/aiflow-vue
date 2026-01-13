@@ -96,7 +96,8 @@ import {
   Filter,
   Files,
 } from '@element-plus/icons-vue'
-import { BlockEnum, BLOCK_CLASSIFICATIONS } from '@/types/workflow'
+import { BlockEnum, BLOCK_CLASSIFICATIONS } from '../../../types/workflow'
+import { nodeCategoriesForPopup, toolCategoriesForPopup } from '../node-categories'
 
 const emit = defineEmits<{
   (e: 'select', type: BlockEnum): void
@@ -105,7 +106,6 @@ const emit = defineEmits<{
 
 const activeTab = ref('nodes')
 const searchText = ref('')
-
 const iconMap: Record<string, any> = {
   [BlockEnum.Start]: VideoPlay,
   [BlockEnum.End]: VideoPause,
@@ -127,47 +127,18 @@ const iconMap: Record<string, any> = {
   [BlockEnum.Loop]: Refresh,
 }
 
-// 节点分类
-const nodeCategories = [
-  {
-    title: '',
-    nodes: [
-      BlockEnum.LLM,
-      BlockEnum.KnowledgeRetrieval,
-      BlockEnum.End,
-    ],
-  },
-  {
-    title: '逻辑',
-    nodes: [
-      BlockEnum.IfElse,
-      BlockEnum.Iteration,
-    ],
-  },
-  {
-    title: '转换',
-    nodes: [
-      BlockEnum.Code,
-      BlockEnum.TemplateTransform,
-      BlockEnum.VariableAssigner,
-    ],
-  },
-]
-
-// 工具分类
-const toolCategories = [
-  {
-    title: '',
-    nodes: [
-      BlockEnum.Tool,
-      BlockEnum.Agent,
-      BlockEnum.HttpRequest,
-    ],
-  },
-]
+const nodeCategories = nodeCategoriesForPopup()
+const toolCategories = toolCategoriesForPopup()
 
 const filteredNodeCategories = computed(() => {
-  if (!searchText.value) return nodeCategories
+  if (!searchText.value) {
+    return nodeCategories
+      .map((category) => ({
+        ...category,
+        nodes: category.nodes,
+      }))
+      .filter((category) => category.nodes.length > 0)
+  }
 
   const keyword = searchText.value.toLowerCase()
   return nodeCategories
@@ -185,7 +156,14 @@ const filteredNodeCategories = computed(() => {
 })
 
 const filteredToolCategories = computed(() => {
-  if (!searchText.value) return toolCategories
+  if (!searchText.value) {
+    return toolCategories
+      .map((category) => ({
+        ...category,
+        nodes: category.nodes,
+      }))
+      .filter((category) => category.nodes.length > 0)
+  }
 
   const keyword = searchText.value.toLowerCase()
   return toolCategories
