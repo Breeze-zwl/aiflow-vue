@@ -37,6 +37,7 @@
               <VarReferencePicker
                 :node-id="id"
                 :model-value="condition.variable_selector || []"
+                :available-vars="availableVars"
                 class="wf-condition-input"
                 @change="(value: string[] | string) => handleConditionChange(caseIndex, conditionIndex, { variable_selector: value as string[] })"
               />
@@ -47,13 +48,6 @@
               >
                 <el-option v-for="option in comparisonOperatorOptions" :key="option.value" :label="option.label" :value="option.value" />
               </el-select>
-              <el-input
-                v-if="needsValue(condition.comparison_operator)"
-                :model-value="condition.value"
-                placeholder="值"
-                class="wf-condition-value"
-                @input="(value: string) => handleConditionChange(caseIndex, conditionIndex, { value })"
-              />
               <RemoveButton
                 v-if="caseItem.conditions.length > 1"
                 @click="() => handleRemoveCondition(caseIndex, conditionIndex)"
@@ -83,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, toRef, inject, type Ref } from 'vue'
 import { v4 as uuid } from 'uuid'
 import Field from '../base/Field.vue'
 import Split from '../base/Split.vue'
@@ -94,6 +88,8 @@ import VarReferencePicker from '../base/VarReferencePicker.vue'
 import { useNodeData } from '../../../../composables/useNodeData'
 import type { IfElseNodeType, ConditionCase, Condition } from '../../../../types/node-config'
 import { ComparisonOperator, LogicalOperator } from '../../../../types/node-config'
+import type { Node, Edge, Var } from '../../../../types/workflow'
+import { BlockEnum, VarType } from '../../../../types/workflow'
 
 const props = defineProps<{
   id: string
@@ -101,6 +97,9 @@ const props = defineProps<{
 }>()
 
 const { inputs, setInputs } = useNodeData<IfElseNodeType>(props.id, toRef(props, 'data'))
+
+const workflowNodes = inject<Ref<Node[]>>('workflowNodes')
+const workflowEdges = inject<Ref<Edge[]>>('workflowEdges')
 
 const logicalOperatorOptions = [
   { label: 'AND', value: LogicalOperator.and },
@@ -124,14 +123,129 @@ const comparisonOperatorOptions = [
 
 const cases = computed(() => inputs.value.cases || [])
 
-const needsValue = (operator: ComparisonOperator) => {
-  return ![
-    ComparisonOperator.isEmpty,
-    ComparisonOperator.isNotEmpty,
-    ComparisonOperator.isNull,
-    ComparisonOperator.isNotNull,
-  ].includes(operator)
+type AvailableVarGroup = {
+  nodeId: string
+  nodeName: string
+  vars: Var[]
 }
+
+const getUpstreamNodeIds = (nodeId: string, edges: Edge[]): string[] => {
+  const upstreamIds: string[] = []
+  const visited = new Set<string>()
+
+  const traverse = (currentId: string) => {
+    if (visited.has(currentId)) return
+    visited.add(currentId)
+
+    for (const edge of edges) {
+      if (edge.target === currentId && edge.source) {
+        upstreamIds.push(edge.source)
+        traverse(edge.source)
+      }
+    }
+  }
+
+  traverse(nodeId)
+  return upstreamIds
+}
+
+const collectOutputNames = (
+  data: Record<string, any> | undefined
+): Array<{ name: string; typeLabel: string }> => {
+  if (!data) return []
+  const outputs = data.outputs as Array<{
+    variable?: string
+    name?: string
+    dataType?: string
+    type?: string
+    value_type?: string
+  }> | Record<string, any> | undefined
+  if (Array.isArray(outputs)) {
+    return outputs
+      .map((item) => ({
+        name: item?.variable || item?.name || '',
+        typeLabel: item?.dataType || item?.type || item?.value_type || 'String',
+      }))
+      .filter((item) => item.name)
+  }
+  if (outputs && typeof outputs === 'object') {
+    return Object.keys(outputs).map((key) => ({
+      name: key,
+      typeLabel:
+        outputs[key]?.dataType || outputs[key]?.type || outputs[key]?.value_type || 'String',
+    }))
+  }
+  const outputDefs = data.outputDefs as Array<{
+    name?: string
+    variable?: string
+    dataType?: string
+    type?: string
+  }> | undefined
+  if (Array.isArray(outputDefs)) {
+    return outputDefs
+      .map((item) => ({
+        name: item?.name || item?.variable || '',
+        typeLabel: item?.dataType || item?.type || 'String',
+      }))
+      .filter((item) => item.name)
+  }
+  return []
+}
+
+const mapTypeLabelToVarType = (label?: string) => {
+  if (!label) return VarType.any
+  const key = label.toLowerCase()
+  if (key === 'string') return VarType.string
+  if (key === 'number') return VarType.number
+  if (key === 'boolean') return VarType.boolean
+  if (key === 'object') return VarType.object
+  if (key === 'array') return VarType.array
+  return VarType.any
+}
+
+const availableVars = computed<AvailableVarGroup[]>(() => {
+  if (!workflowNodes?.value || !workflowEdges?.value) return []
+  const upstreamNodeIds = new Set(getUpstreamNodeIds(props.id, workflowEdges.value))
+  const groups: AvailableVarGroup[] = []
+
+  for (const node of workflowNodes.value) {
+    const data = node.data as Record<string, any> | undefined
+    if (!data) continue
+
+    if (data.type !== BlockEnum.Start && !upstreamNodeIds.has(node.id)) continue
+
+    const vars: Var[] = []
+    if (data.type === BlockEnum.Start) {
+      const parameters = data.parameters as Array<{ name?: string; dataType?: string }> | undefined
+      if (Array.isArray(parameters)) {
+        for (const param of parameters) {
+          if (!param?.name) continue
+          vars.push({
+            variable: param.name,
+            type: mapTypeLabelToVarType(param.dataType),
+          })
+        }
+      }
+    } else {
+      const outputs = collectOutputNames(data)
+      for (const output of outputs) {
+        vars.push({
+          variable: output.name,
+          type: mapTypeLabelToVarType(output.typeLabel),
+        })
+      }
+    }
+
+    if (!vars.length) continue
+    groups.push({
+      nodeId: node.id,
+      nodeName: (data.title as string) || node.id,
+      vars,
+    })
+  }
+
+  return groups
+})
 
 const handleAddCase = () => {
   const next = [...(inputs.value.cases || [])]
@@ -243,13 +357,12 @@ const handleLogicalOperatorChange = (caseIndex: number, value: LogicalOperator) 
 
 .wf-condition-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 140px 140px auto;
+  grid-template-columns: minmax(0, 1fr) 140px auto;
   gap: 8px;
   align-items: center;
 }
 
-.wf-condition-operator,
-.wf-condition-value {
+.wf-condition-operator {
   width: 140px;
 }
 

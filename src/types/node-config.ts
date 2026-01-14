@@ -239,6 +239,12 @@ export type QuestionClassifierNodeType = NodeWithParameters & {
     name: string
   }
   instruction?: string
+  outputDefs?: Array<{
+    name: string
+    dataType: string
+    description?: string
+    defaultValue?: string
+  }>
 }
 
 export type VariableAssignerNodeType = NodeWithParameters & {

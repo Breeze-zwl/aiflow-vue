@@ -3,7 +3,7 @@
     ref="nodeRef"
     class="wf-node"
     :class="{ 'wf-node--selected': selected }"
-    :style="{ minWidth: '200px' }"
+    :style="{ minWidth: '200px', minHeight: nodeMinHeight }"
   >
     <Handle
       v-if="!isStartNode"
@@ -30,13 +30,16 @@
       </div>
     </div>
 
-    <div v-if="!data.desc && classification.description" class="wf-node__hint">
+    <div
+      v-if="!isIfElseNode && !data.desc && classification.description"
+      class="wf-node__hint"
+    >
       {{ classification.description }}
     </div>
 
     <!-- 右侧连接点区域 -->
     <div
-      v-if="!isEndNode"
+      v-if="!isEndNode && !isIfElseNode && !isQuestionClassifierNode"
       class="wf-node__source-area"
       @mouseenter="handleMouseEnter"
       @mouseleave="handleMouseLeave"
@@ -56,6 +59,57 @@
           <div>拖拽连接节点</div>
         </div>
       </Transition>
+    </div>
+
+    <div v-else-if="isIfElseNode" class="wf-node__branch-area wf-node__branch-area--classifier">
+      <div class="wf-node__branch wf-node__branch--classifier">
+        <div class="wf-node__branch-card">
+          <div class="wf-node__branch-title">IF</div>
+        </div>
+        <Handle
+          id="if"
+          type="source"
+          :position="Position.Right"
+          class="wf-handle wf-handle--branch wf-handle--branch-classifier wf-handle--as-plus"
+          :style="branchHandleStyle"
+          @click="(event) => handleAddClick(event, 'if')"
+        />
+      </div>
+      <div class="wf-node__branch wf-node__branch--classifier">
+        <div class="wf-node__branch-card">
+          <div class="wf-node__branch-title">ELSE</div>
+        </div>
+        <Handle
+          id="else"
+          type="source"
+          :position="Position.Right"
+          class="wf-handle wf-handle--branch wf-handle--branch-classifier wf-handle--as-plus"
+          :style="branchHandleStyle"
+          @click="(event) => handleAddClick(event, 'else')"
+        />
+      </div>
+    </div>
+    <div
+      v-else-if="isQuestionClassifierNode"
+      class="wf-node__branch-area wf-node__branch-area--classifier"
+    >
+      <div
+        v-for="(item, index) in classifierBranches"
+        :key="item.id || index"
+        class="wf-node__branch wf-node__branch--classifier"
+      >
+        <div class="wf-node__branch-card">
+          <div class="wf-node__branch-title">分类{{ index + 1 }}</div>
+        </div>
+        <Handle
+          :id="String(item.id || index)"
+          type="source"
+          :position="Position.Right"
+          class="wf-handle wf-handle--branch wf-handle--branch-classifier wf-handle--as-plus"
+          :style="branchHandleStyle"
+          @click="(event) => handleAddClick(event)"
+        />
+      </div>
     </div>
 
     <!-- 节点选择器弹窗 - 使用 Teleport 渲染到 body -->
@@ -146,6 +200,10 @@ const classification = computed(() => {
 
 const isStartNode = computed(() => props.data.type === BlockEnum.Start)
 const isEndNode = computed(() => props.data.type === BlockEnum.End)
+const isIfElseNode = computed(() => props.data.type === BlockEnum.IfElse)
+const isQuestionClassifierNode = computed(
+  () => props.data.type === BlockEnum.QuestionClassifier
+)
 
 const iconComponent = computed(() => {
   const icon = classification.value.icon
@@ -173,7 +231,17 @@ const iconComponent = computed(() => {
   return map[icon] || Cpu
 })
 
-const handleStyle = (position: 'left' | 'right' | 'top' | 'bottom') => {
+const classifierBranches = computed(() => {
+  const list = (props.data as Record<string, any>)?.classes
+  return Array.isArray(list) ? list : []
+})
+
+const nodeMinHeight = computed(() => 'auto')
+
+const handleStyle = (
+  position: 'left' | 'right' | 'top' | 'bottom',
+  top?: string
+) => {
   const baseStyle = {
     width: '10px',
     height: '10px',
@@ -182,10 +250,18 @@ const handleStyle = (position: 'left' | 'right' | 'top' | 'bottom') => {
   }
 
   if (position === 'left') return { ...baseStyle, left: '-5px' }
-  if (position === 'right') return { ...baseStyle, right: '-5px' }
+  if (position === 'right')
+    return { ...baseStyle, right: '-5px', top: top || '50%' }
   if (position === 'top') return { ...baseStyle, top: '-5px' }
   if (position === 'bottom') return { ...baseStyle, bottom: '-5px' }
   return baseStyle
+}
+
+const branchHandleStyle = {
+  width: '10px',
+  height: '10px',
+  background: '#3b82f6',
+  border: '2px solid #ffffff',
 }
 
 const handleMouseEnter = () => {
@@ -210,7 +286,7 @@ const updatePopupPosition = () => {
   }
 }
 
-const handleAddClick = (event: MouseEvent) => {
+const handleAddClick = (event: MouseEvent, _sourceHandle?: string) => {
   // 阻止事件冒泡，避免触发节点点击事件
   event.stopPropagation()
   // 如果正在拖拽连线，不弹出选择器
@@ -335,6 +411,83 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   z-index: 10;
+}
+
+.wf-node__branch-area {
+  position: absolute;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  z-index: 10;
+  align-items: flex-end;
+  width: calc(100% + 22px);
+}
+
+.wf-node__branch {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.wf-node__branch-label {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.wf-node__branch :deep(.vue-flow__handle) {
+  margin-left: 4px;
+}
+
+.wf-node__branch-area--classifier {
+  position: relative;
+  left: auto;
+  right: auto;
+  top: auto;
+  transform: none;
+  margin-top: 10px;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.wf-node__branch--classifier {
+  width: 100%;
+  justify-content: space-between;
+  position: relative;
+}
+
+.wf-node__branch-card {
+  flex: 1;
+  background: #f3f4f6;
+  border-radius: 10px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.wf-node__branch-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.wf-handle--branch-classifier {
+  position: absolute !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  margin-left: 0 !important;
+}
+
+.wf-handle--branch {
+  position: relative !important;
+  top: auto !important;
+  transform: none !important;
 }
 
 /* 右侧连接点 Handle */
